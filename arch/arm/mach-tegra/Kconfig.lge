@@ -8,6 +8,34 @@ choice
        depends on MACH_STAR
 endchoice
 
+config FAKE_SHMOO
+	bool "Tegra2 Overclocking Enable"
+	depends on MACH_STAR
+	default y
+
+config BOOST_PERIPHERALS
+	bool "Tegra2 Overclocking Peripheral Enable"
+	depends on MACH_STAR
+	default y
+
+config MAX_AVP_OC_FREQ
+	int "AVP Overclock Frequency"
+	default 280000
+        depends on FAKE_SHMOO && BOOST_PERIPHERALS
+
+config MAX_3D_OC_FREQ
+	int "3D Overclock Frequency"
+	default 350000
+        depends on FAKE_SHMOO && BOOST_PERIPHERALS
+
+config DDR2_SDRAM_FREQ
+	int "DDR2 SDRAM Frequency"
+	default 300000
+
+config GPU_MEM_CARVEOUT_SZ
+	int "GPU Memory Carveout Size"
+	default 128
+
 config STAR_PMIC
 	bool "star pmic test"
 	depends on MACH_STAR

@@ -52,6 +52,19 @@
 #include "ap20/ap20rm_power_dfs.h"
 #include "ap20/ap20rm_clocks.h"
 
+#ifdef CONFIG_FAKE_SHMOO
+#include <linux/kernel.h>
+
+/* 
+ * TEGRA AP20 CPU OC/UV Hack by Cpasjuste @ https://github.com/Cpasjuste/android_kernel_lg_p990
+*/
+
+extern NvRmCpuShmoo fake_CpuShmoo; // Pointer to fake CpuShmoo
+extern int *FakeShmoo_UV_mV_Ptr; // Stored voltage table from cpufreq sysfs
+NvRmDfs *fakeShmoo_Dfs; // Used to get temp from cpufreq
+
+#endif // CONFIG_FAKE_SHMOO
+
 /*****************************************************************************/
 
 // Initial DFS configuration
@@ -810,6 +823,12 @@ static void DfsParametersInit(NvRmDfs* pDfs)
         pDfs->LowCornerKHz.Domains[i] = pDfs->DfsParameters[i].MinKHz;
         pDfs->HighCornerKHz.Domains[i] = pDfs->DfsParameters[i].MaxKHz;
     }
+
+#ifdef CONFIG_FAKE_SHMOO
+	// Set maximum scaling frequency to 1100mhz at boot
+	pDfs->HighCornerKHz.Domains[NvRmDfsClockId_Cpu] = 1015000;
+#endif // FAKE_SHMOO
+
     pDfs->CpuCornersShadow.MinKHz =
         pDfs->LowCornerKHz.Domains[NvRmDfsClockId_Cpu];
     pDfs->CpuCornersShadow.MaxKHz =
@@ -1515,9 +1534,9 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
         if (NeedClockUpdate || pDfs->VoltageScaler.UpdateFlag ||
             pDfs->ThermalThrottler.TcorePolicy.UpdateFlag)
         {
+            NvRmPrivLockSharedPll();
             if (!pDfs->VoltageScaler.StopFlag)
             {
-                NvRmPrivLockSharedPll();
                 // Check temperature and throttle DFS clocks if necessry. Make
                 // sure V/F scaling is running while throttling is in progress.
                 pDfs->VoltageScaler.UpdateFlag =
@@ -1533,8 +1552,8 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
                 NvOsIntrMutexLock(pDfs->hIntrMutex);
                 pDfs->CurrentKHz = DfsKHz;
                 NvOsIntrMutexUnlock(pDfs->hIntrMutex);
-            NvRmPrivUnlockSharedPll();
             }
+            NvRmPrivUnlockSharedPll();
 
             // Complete synchronous busy hint processing.
             if (pDfs->BusySyncState == NvRmDfsBusySyncState_Execute)
@@ -1843,6 +1862,10 @@ NvError NvRmPrivDfsInit(NvRmDeviceHandle hRmDeviceHandle)
     NvError error;
     NvRmDfsFrequencies DfsKHz;
     NvRmDfs* pDfs = &s_Dfs;
+
+#ifdef CONFIG_FAKE_SHMOO
+    fakeShmoo_Dfs = &s_Dfs; // Crappy way to get temp ?!
+#endif
 
     NV_ASSERT(hRmDeviceHandle);
     DfsHintsPrintInit();
@@ -2226,6 +2249,21 @@ DvsChangeCpuVoltage(
     NvRmDvs* pDvs,
     NvRmMilliVolts TargetMv)
 {
+#ifdef CONFIG_FAKE_SHMOO
+	// Voltage hack
+	int i = 0;
+	if( FakeShmoo_UV_mV_Ptr != NULL )
+	{
+		for(i=0; i <fake_CpuShmoo.ShmooVmaxIndex+1; i++)
+		{
+			if(fake_CpuShmoo.ShmooVoltages[i] == TargetMv)
+			{
+				TargetMv -= FakeShmoo_UV_mV_Ptr[i];
+				break;
+			}
+		}
+	}
+#endif // CONFIG_FAKE_SHMOO
     NV_ASSERT(TargetMv >= pDvs->MinCpuMv);
     NV_ASSERT(TargetMv <= pDvs->NominalCpuMv);
 
@@ -2233,6 +2271,9 @@ DvsChangeCpuVoltage(
     {
         NvRmPmuSetVoltage(hRm, pDvs->CpuRailAddress, TargetMv, NULL);
         pDvs->CurrentCpuMv = TargetMv;
+#ifdef CONFIG_FAKE_SHMOO
+	//printk( "*** fakeShmoo **** -> CurrentCpuMv : %i\n", TargetMv );
+#endif
     }
 }
 
@@ -2366,10 +2407,16 @@ void NvRmPrivDvsInit(void)
     }
     else if (pDfs->hRm->ChipId.Id == 0x20)
     {
+        pDvs->MinCoreMv = NV_MAX(pDvs->MinCoreMv,
+            NVRM_AP20_RELIABILITY_CORE_MV(pDfs->hRm->ChipId.SKU));
+        NV_ASSERT(pDvs->MinCoreMv <= pDvs->NominalCoreMv);
         pDvs->LowCornerCoreMv = NV_MAX(NVRM_AP20_LOW_CORE_MV, pDvs->MinCoreMv);
         pDvs->LowCornerCoreMv =
             NV_MIN(pDvs->LowCornerCoreMv, pDvs->NominalCoreMv);
 
+        pDvs->MinCpuMv = NV_MAX(pDvs->MinCpuMv,
+            NVRM_AP20_RELIABILITY_CPU_MV(pDfs->hRm->ChipId.SKU));
+        NV_ASSERT(pDvs->MinCpuMv <= pDvs->NominalCpuMv);
         pDvs->LowCornerCpuMv = NV_MAX(NVRM_AP20_LOW_CPU_MV, pDvs->MinCpuMv);
         pDvs->LowCornerCpuMv =
             NV_MIN(pDvs->LowCornerCpuMv, pDvs->NominalCpuMv);
@@ -2684,6 +2731,7 @@ void NvRmPrivDfsSuspend(NvOdmSocPowerState state)
             NvRmMilliVolts v = NV_MAX(pDvs->DvsCorner.SystemMv,
                                       NV_MAX(pDvs->DvsCorner.EmcMv,
                                              pDvs->DvsCorner.ModulesMv));
+            v = NV_MAX(v, pDvs->MinCoreMv);
 
             // If CPU rail returns to default level by PMU underneath DVFS
             // need to synchronize voltage after LP1 same way as after LP2
