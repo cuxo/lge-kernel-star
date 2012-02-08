@@ -90,9 +90,9 @@ NvU32 FakeShmooVoltages[] = {
     850,
     900,
     1000,
-    1055,
-    1155,
-    1255
+    1050,
+    1125,
+    1250
 };
 
 NvRmScaledClkLimits FakepScaledCpuLimits = {
@@ -288,12 +288,6 @@ NvRmPrivClockLimitsInit(NvRmDeviceHandle hRmDevice)
             s_pClockScales[id] = pHwLimits[i].MaxKHzList;
         }
     }
-
-        s_ClockRangeLimits[2].MaxKHz = 240000;
-        s_ClockRangeLimits[7].MaxKHz = 325000;
-        s_ClockRangeLimits[8].MaxKHz = 345000;
-        s_ClockRangeLimits[10].MaxKHz = 325000;
-
     // Fill in CPU scaling data if SoC has dedicated CPU rail, and CPU clock
     // characterization data is separated from other modules on common core rail
     if (s_ChipFlavor.pCpuShmoo)

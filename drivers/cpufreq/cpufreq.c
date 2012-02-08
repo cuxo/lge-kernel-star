@@ -28,7 +28,6 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
-#include <linux/earlysuspend.h>
 
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
@@ -852,23 +851,6 @@ static struct kobj_type ktype_cpufreq = {
 	.release	= cpufreq_sysfs_release,
 };
 
-#ifdef CONFIG_SMP
-/*
- * Checks to see if a cpu is managed by another cpu.
- *
- * @cpu: id of the cpu to check
- * @pol: policy associated with the cpu
- *
- * Returns the id of the managing cpu or -1 if not managed.
- */
-static int cpufreq_check_managed(int cpu, struct cpufreq_policy *pol)
-{
-	int pcpu = per_cpu(policy_cpu, cpu);
-	return (cpumask_weight(pol->cpus) > 1 &&
-		cpumask_test_cpu(cpu, pol->cpus) && cpu != pcpu) ? pcpu : -1;
-}
-#endif // CONFIG_SMP
-
 /*
  * Returns:
  *   Negative: Failure
@@ -1065,6 +1047,7 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 	unsigned int j;
 #ifdef CONFIG_HOTPLUG_CPU
 	int sibling;
+	struct cpufreq_policy *cp=NULL;
 #endif
 
 	if (cpu_is_offline(cpu))
@@ -1078,15 +1061,7 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 	 * CPU because it is in the same boat. */
 	policy = cpufreq_cpu_get(cpu);
 	if (unlikely(policy)) {
-		ret = sysfs_create_link_nowarn(&sys_dev->kobj,
-						&policy->kobj, "cpufreq");
-		if (ret) {
 		cpufreq_cpu_put(policy);
-		} else {
-			spin_lock_irqsave(&cpufreq_driver_lock, flags);
-			cpumask_set_cpu(cpu, policy->cpus);
-			spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
-		}
 		cpufreq_debug_enable_ratelimit();
 		return 0;
 	}
@@ -1121,12 +1096,11 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 
 	/* Set governor before ->init, so that driver could check it */
 #ifdef CONFIG_HOTPLUG_CPU
-struct cpufreq_policy *cp;
 	for_each_online_cpu(sibling) {
 		cp = per_cpu(cpufreq_cpu_data, sibling);
 		dprintk("found sibling %d\n", sibling);
-		if (cp && cp->governor &&
-		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
+		if (cp != NULL) {
+			dprintk("found sibling CPU, copying policy\n");
 			policy->governor = cp->governor;
 			policy->min = cp->min;
 			policy->max = cp->max;
@@ -1957,14 +1931,6 @@ int cpufreq_update_policy(unsigned int cpu)
 		goto fail;
 	}
 
-#ifdef CONFIG_SMP
-	if (cpufreq_check_managed(cpu, data) >= 0) {
-		unlock_policy_rwsem_write(cpu);
-		ret = 0;
-		goto fail;
-	}
-#endif
-
 	dprintk("updating policy for CPU %u\n", cpu);
 	memcpy(&policy, data, sizeof(struct cpufreq_policy));
 	policy.min = data->user_policy.min;
@@ -2137,71 +2103,6 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
-#ifdef CONFIG_CPUFREQ_SCROFF_LIMIT
-
-unsigned int prev_max_freq;
-unsigned int prev_min_freq;
-
-static void powersave_early_suspend(struct early_suspend *handler)
-{
-	int cpu;
-
-	for_each_online_cpu(cpu) {
-		struct cpufreq_policy *cpu_policy, new_policy;
-
-		cpu_policy = cpufreq_cpu_get(cpu);
-		if (!cpu_policy)
-			continue;
-		if (cpufreq_get_policy(&new_policy, cpu))
-			goto out;
-		prev_max_freq = cpu_policy->max;
-		prev_min_freq = cpu_policy->min;
-		new_policy.max = CONFIG_CPUFREQ_SCROFF_LIMIT_VALUE;
-		new_policy.min = cpu_policy->cpuinfo.min_freq;
-		printk(KERN_INFO
-			"%s: set cpu%d freq in the %u-%u KHz range\n",
-			__func__, cpu, new_policy.min, new_policy.max);
-		__cpufreq_set_policy(cpu_policy, &new_policy);
-		cpu_policy->user_policy.policy = cpu_policy->policy;
-		cpu_policy->user_policy.governor = cpu_policy->governor;
-out:
-		cpufreq_cpu_put(cpu_policy);
-	}
-}
-
-static void powersave_late_resume(struct early_suspend *handler)
-{
-	int cpu;
-
-	for_each_online_cpu(cpu) {
-		struct cpufreq_policy *cpu_policy, new_policy;
-
-		cpu_policy = cpufreq_cpu_get(cpu);
-		if (!cpu_policy)
-			continue;
-		if (cpufreq_get_policy(&new_policy, cpu))
-			goto out;
-		new_policy.max = prev_max_freq;
-		new_policy.min = prev_min_freq;
-		printk(KERN_INFO
-			"%s: set cpu%d freq in the %u-%u KHz range\n",
-			__func__, cpu, new_policy.min, new_policy.max);
-		__cpufreq_set_policy(cpu_policy, &new_policy);
-		cpu_policy->user_policy.policy = cpu_policy->policy;
-		cpu_policy->user_policy.governor = cpu_policy->governor;
-out:
-		cpufreq_cpu_put(cpu_policy);
-	}
-}
-
-static struct early_suspend _powersave_early_suspend = {
-	.suspend = powersave_early_suspend,
-	.resume = powersave_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
-};
-
-#endif // CONFIG_CPUFREQ_SCROFF_LIMIT
-
 static int __init cpufreq_core_init(void)
 {
 	int cpu;
@@ -2219,12 +2120,6 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq",
 						&cpu_sysdev_class.kset.kobj);
 	BUG_ON(!cpufreq_global_kobject);
-
-#ifdef CONFIG_CPUFREQ_SCROFF_LIMIT
-
-	register_early_suspend(&_powersave_early_suspend);
-
-#endif // CONFIG_CPUFREQ_SCROFF_LIMIT
 
 	return 0;
 }
