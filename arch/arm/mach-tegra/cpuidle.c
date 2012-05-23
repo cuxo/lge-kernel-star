@@ -30,6 +30,7 @@
 #include <linux/io.h>
 #include <linux/tick.h>
 #include <linux/interrupt.h>
+#include <linux/slab.h>
 #include <mach/iomap.h>
 #include <linux/suspend.h>
 
@@ -38,7 +39,7 @@
 #define LATENCY_FACTOR_SHIFT 8
 
 static unsigned int latency_factor __read_mostly = 80;	// factor ~ 0.3
-static unsigned int pwrgood_latency = 2000;
+static unsigned int pwrgood_latency = 1600;
 static unsigned int system_is_suspending = 0;
 module_param(latency_factor, uint, 0644);
 
