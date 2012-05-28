@@ -25,7 +25,7 @@
 static __inline__ int get_bitmask_order(unsigned int count)
 {
 	int order;
-	
+
 	order = fls(count);
 	return order;	/* We could be slightly more clever with -1 here... */
 }
@@ -33,7 +33,7 @@ static __inline__ int get_bitmask_order(unsigned int count)
 static __inline__ int get_count_order(unsigned int count)
 {
 	int order;
-	
+
 	order = fls(count) - 1;
 	if (count & (count - 1))
 		order++;
@@ -43,6 +43,26 @@ static __inline__ int get_count_order(unsigned int count)
 static inline unsigned long hweight_long(unsigned long w)
 {
 	return sizeof(w) == 4 ? hweight32(w) : hweight64(w);
+}
+
+/**
+ * rol64 - rotate a 64-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u64 rol64(__u64 word, unsigned int shift)
+{
+	return (word << shift) | (word >> (64 - shift));
+}
+
+/**
+ * ror64 - rotate a 64-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u64 ror64(__u64 word, unsigned int shift)
+{
+	return (word >> shift) | (word << (64 - shift));
 }
 
 /**

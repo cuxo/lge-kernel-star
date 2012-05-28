@@ -412,7 +412,7 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	cdi->mc_flags = 0;
 	cdo->n_minors = 0;
         cdi->options = CDO_USE_FFLAGS;
-	
+
 	if (autoclose==1 && CDROM_CAN(CDC_CLOSE_TRAY))
 		cdi->options |= (int) CDO_AUTO_CLOSE;
 	if (autoeject==1 && CDROM_CAN(CDC_OPEN_TRAY))
@@ -887,7 +887,7 @@ static int cdrom_open_write(struct cdrom_device_info *cdi)
 		ram_write = 1;
 	else
 		(void) cdrom_is_random_writable(cdi, &ram_write);
-	
+
 	if (mrw)
 		cdi->mask &= ~CDC_MRW;
 	else
@@ -1261,7 +1261,7 @@ static int cdrom_slot_status(struct cdrom_device_info *cdi, int slot)
 	cdinfo(CD_CHANGER, "entering cdrom_slot_status()\n"); 
 	if (cdi->sanyo_slot)
 		return CDS_NO_INFO;
-	
+
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
@@ -1634,7 +1634,7 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 	case DVD_LU_SEND_ASF:
 		cdinfo(CD_DVD, "entering DVD_LU_SEND_ASF\n"); 
 		setup_report_key(&cgc, ai->lsasf.agid, 5);
-		
+
 		if ((ret = cdo->generic_packet(cdi, &cgc)))
 			return ret;
 
@@ -1903,7 +1903,7 @@ static int dvd_read_struct(struct cdrom_device_info *cdi, dvd_struct *s,
 
 	case DVD_STRUCT_MANUFACT:
 		return dvd_read_manufact(cdi, s, cgc);
-		
+
 	default:
 		cdinfo(CD_WARNING, ": Invalid DVD structure read requested (%d)\n",
 					s->type);
@@ -2019,7 +2019,7 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
 	cgc->cmd[7] = (nblocks >>  8) & 0xff;
 	cgc->cmd[8] = nblocks & 0xff;
 	cgc->buflen = blksize * nblocks;
-	
+
 	/* set the header info returned */
 	switch (blksize) {
 	case CD_FRAMESIZE_RAW0	: cgc->cmd[9] = 0x58; break;
@@ -2027,7 +2027,7 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
 	case CD_FRAMESIZE_RAW	: cgc->cmd[9] = 0xf8; break;
 	default			: cgc->cmd[9] = 0x10;
 	}
-	
+
 	return cdo->generic_packet(cdi, cgc);
 }
 
@@ -2057,11 +2057,6 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 	if (!nr)
 		return -ENOMEM;
 
-	if (!access_ok(VERIFY_WRITE, ubuf, nframes * CD_FRAMESIZE_RAW)) {
-		ret = -EFAULT;
-		goto out;
-	}
-
 	cgc.data_direction = CGC_DATA_READ;
 	while (nframes > 0) {
 		if (nr > nframes)
@@ -2070,7 +2065,7 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
 		if (ret)
 			break;
-		if (__copy_to_user(ubuf, cgc.buffer, CD_FRAMESIZE_RAW * nr)) {
+		if (copy_to_user(ubuf, cgc.buffer, CD_FRAMESIZE_RAW * nr)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2078,7 +2073,6 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		nframes -= nr;
 		lba += nr;
 	}
-out:
 	kfree(cgc.buffer);
 	return ret;
 }
@@ -2963,7 +2957,7 @@ static noinline int mmc_ioctl_cdrom_volume(struct cdrom_device_info *cdi,
 	ret = cdrom_mode_sense(cdi, cgc, GPMODE_AUDIO_CTL_PAGE, 0);
 	if (ret)
 		return ret;
-		
+
 	/* originally the code depended on buffer[1] to determine
 	   how much data is available for transfer. buffer[1] is
 	   unfortunately ambigious and the only reliable way seem
@@ -2996,7 +2990,7 @@ static noinline int mmc_ioctl_cdrom_volume(struct cdrom_device_info *cdi,
 		IOCTL_OUT(arg, struct cdrom_volctrl, volctrl);
 		return 0;
 	}
-		
+
 	/* get the volume mask */
 	cgc->buffer = mask;
 	ret = cdrom_mode_sense(cdi, cgc, GPMODE_AUDIO_CTL_PAGE, 1);
@@ -3175,7 +3169,7 @@ static int cdrom_get_track_info(struct cdrom_device_info *cdi, __u16 track, __u8
 
 	if ((ret = cdo->generic_packet(cdi, &cgc)))
 		return ret;
-	
+
 	buflen = be16_to_cpu(ti->track_information_length) +
 		     sizeof(ti->track_information_length);
 
@@ -3417,7 +3411,7 @@ static int cdrom_sysctl_info(ctl_table *ctl, int write,
 	int pos;
 	char *info = cdrom_sysctl_settings.info;
 	const int max_size = sizeof(cdrom_sysctl_settings.info);
-	
+
 	if (!*lenp || (*ppos && !write)) {
 		*lenp = 0;
 		return 0;
@@ -3426,7 +3420,7 @@ static int cdrom_sysctl_info(ctl_table *ctl, int write,
 	mutex_lock(&cdrom_mutex);
 
 	pos = sprintf(info, "CD-ROM information, " VERSION "\n");
-	
+
 	if (cdrom_print_info("\ndrive name:\t", 0, info, &pos, CTL_NAME))
 		goto done;
 	if (cdrom_print_info("\ndrive speed:\t", 0, info, &pos, CTL_SPEED))
@@ -3528,11 +3522,11 @@ static int cdrom_sysctl_handler(ctl_table *ctl, int write,
 				void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int ret;
-	
+
 	ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
 
 	if (write) {
-	
+
 		/* we only care for 1 or 0. */
 		autoclose        = !!cdrom_sysctl_settings.autoclose;
 		autoeject        = !!cdrom_sysctl_settings.autoeject;
