@@ -508,14 +508,6 @@ static void __init tegra_generic_init(void)
 	tegra_setup_bluesleep_csr();
 }
 
-extern void __init tegra_allocate_memory_regions(void);
-static void __init tegra_map_io(void)
-{
-	tegra_map_common_io();
-
-	tegra_allocate_memory_regions();
-}
-
 MACHINE_START(VENTANA, "NVIDIA Ventana Development System")
 	.boot_params  = 0x00000100,
 	.phys_io        = IO_APB_PHYS,
@@ -532,7 +524,7 @@ MACHINE_START(HARMONY, "NVIDIA Harmony Development System")
 	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
 	.init_irq       = tegra_init_irq,
 	.init_machine   = tegra_harmony_init,
-	.map_io         = tegra_map_io,
+	.map_io         = tegra_map_common_io,
 	.timer          = &tegra_timer,
 MACHINE_END
 
