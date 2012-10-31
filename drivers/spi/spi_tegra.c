@@ -634,7 +634,7 @@ static int spi_tegra_start_dma_based_transfer(
 				"Error in starting rx dma error = %d\n", ret);
 			if (tspi->cur_direction & DATA_DIR_TX)
 				cancel_dma(tspi->tx_dma, &tspi->tx_dma_req);
-			TEGRA_ERR_LOG("%s: Error in starting rx dma ret = %d\n", ret); 	
+			TEGRA_ERR_LOG("Error in starting rx dma ret = %d\n", ret); 	
 			return ret;
 		}
 	}

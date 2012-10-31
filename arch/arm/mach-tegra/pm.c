@@ -1033,7 +1033,7 @@ static struct kobj_attribute suspend_mode_attribute =
 static struct kobject *suspend_kobj;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-extern bool in_call_state();
+	extern bool in_call_state();
 #endif // MOBII LP1 sleep
 
 static int tegra_pm_enter_suspend(void)
