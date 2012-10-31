@@ -183,6 +183,12 @@ config CPU_FREQ_GOV_INTERACTIVE
 	  'interactive' - This driver adds a dynamic cpufreq policy governor
 	  designed for latency-sensitive workloads.
 
+config CPU_FREQ_GOV_LULZACTIVE
+	tristate "'lulzactive' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  'lulzactive' - a new interactive governor by Tegrak!
+
 config DYNAMIC_FREQ_MODE
 	bool "dyncmic frequency mode (EXPERIMENTAL)"
 	depends on CPU_FREQ_GOV_INTERACTIVE
