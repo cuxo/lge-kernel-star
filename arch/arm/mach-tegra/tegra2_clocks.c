@@ -162,10 +162,10 @@
 #ifdef CONFIG_TEGRA_OC
 //#define TEGRA_MAX_CLOCK			1200000000
 //#define TEGRA_MAX_CLOCK			1248000000
-//#define TEGRA_MAX_CLOCK			1352000000
 //#define TEGRA_MAX_CLOCK			1404000000
 //#define TEGRA_MAX_CLOCK			1456000000
-#define TEGRA_MAX_CLOCK			1500000000
+//#define TEGRA_MAX_CLOCK			1500000000
+#define TEGRA_MAX_CLOCK			1352000000
 #else
 #define TEGRA_MAX_CLOCK			1000000000
 #endif
@@ -1961,24 +1961,6 @@ static struct clk tegra_pll_u = {
 
 static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
 #ifdef CONFIG_TEGRA_OC
-	/* 1.500 GHz */
-	{ 12000000, 1500000000,  875,  7, 1, 12},
-	{ 13000000, 1500000000,  923,  8, 1, 12},
-	{ 19200000, 1500000000,  625,  8, 1,  8},
-	{ 26000000, 1500000000,  750, 13, 1, 12},
-
-	/* 1.456 GHz */
-	{ 12000000, 1456000000,  728,  6, 1, 12},
-	{ 13000000, 1456000000,  896,  8, 1, 12},
-	{ 19200000, 1456000000,  910, 12, 1,  8},
-	{ 26000000, 1456000000,  896, 16, 1, 12},
-
-	/* 1.404 GHz */
-	{ 12000000, 1404000000,  936,  8, 1, 12},
-	{ 13000000, 1404000000,  972,  9, 1, 12},
-	{ 19200000, 1404000000,  585,  8, 1,  8},
-	{ 26000000, 1404000000,  972, 18, 1, 12},
-
 	/* 1.352 GHz */
 	{ 12000000, 1352000000,  676,  6, 1, 12},
 	{ 13000000, 1352000000,  936,  9, 1, 12},
@@ -2764,10 +2746,7 @@ static struct cpufreq_frequency_table freq_table_1p5GHz[] = {
 	{ 8, 1200000 },
 	{ 9, 1248000 },
 	{10, 1352000 },
-	{11, 1404000 },
-	{12, 1456000 },
-	{13, 1500000 },
-	{14, CPUFREQ_TABLE_END }
+	{11, CPUFREQ_TABLE_END }
 };
 #endif
 
